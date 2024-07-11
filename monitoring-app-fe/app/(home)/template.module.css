@@ -1,0 +1,42 @@
+.navbar {
+  grid-area: Navbar;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+}
+
+.navbar > div {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.footer {
+  grid-area: Footer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+}
+
+.main {
+  grid-area: Main;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+}
+
+.home_layout {
+  display: grid;
+  grid-template-areas:
+  'Navbar'
+  'Main'
+  'Footer';
+  grid-template-rows: 80px 1fr 200px;
+  height: 100vh;
+}

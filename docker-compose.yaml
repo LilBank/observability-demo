@@ -1,0 +1,102 @@
+services:
+  springboot-app:
+    build: ./demoApp
+    image: monitoring-be:v1
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - JAVA_OPTS=
+      - OTEL_SERVICE_NAME=springboot-app
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_LOGS_EXPORTER=none
+    depends_on:
+      - otel-collector
+
+  nextjs-app:
+    build: ./monitoring-app-fe
+    image: monitoring-fe:v1
+    restart: always
+    ports:
+      - "3001:3000"
+    environment:
+      - MESSAGING_API_BASE_URL=springboot-app
+      - MESSAGING_API_PORT=8080
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_NODE_RESOURCE_DETECTORS=env,host
+      - OTEL_SERVICE_NAME=next-app
+      - NODE_OPTIONS=--require @opentelemetry/auto-instrumentations-node/register
+    depends_on:
+      - otel-collector
+
+  jaeger-all-in-one:
+    image: jaegertracing/all-in-one:1.58
+    restart: always
+    ports:
+      - "16686:16686"
+      - "14268"
+      - "14250"
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.104.0
+    restart: always
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "1888:1888"   # pprof extension
+      - "8888:8888"   # Prometheus metrics exposed by the collector
+      - "8889:8889"   # Prometheus exporter metrics
+      - "13133:13133" # health_check extension
+      - "4317:4317"   # OLTP gRPC receiver
+      - "4318:4318"   # OLTP HTTP receiver
+      - "55679:55679" # zpages extension
+    depends_on:
+      - jaeger-all-in-one
+      - prometheus
+      - elasticsearch
+
+  prometheus:
+    image: prom/prometheus:latest
+    restart: always
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.4.0
+    container_name: elasticsearch
+    environment:
+      - node.name=es01
+      - cluster.name=docker-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.4.0
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+      - "8200:8200"
+    depends_on:
+      - elasticsearch
+
+volumes:
+  es-data:
+    driver: local
